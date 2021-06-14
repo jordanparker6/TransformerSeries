@@ -1,2 +1,2 @@
 make tensorboard:
-	tensorboard --logdir=models/logs
+	tensorboard --logdir=train/models/logs

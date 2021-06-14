@@ -10,7 +10,7 @@ from pathlib import Path
 
 import config
 from model import TransformerSeries
-from plot import plot_training
+from plot import plot_teacher_forcing
 
 logger = logging.getLogger(__name__)
 log_dir = config.MODEL_DIR.joinpath("logs")
@@ -33,11 +33,9 @@ def sigmoid_decay(x: float, scale: float):
 def run_training(
         data: Dataset, 
         epochs: int,
-        attn_heads: int, 
         k: float,
         initial_teacher_period: int,
-        model_dir: Path,
-        device: str
+        model_dir: Path
     ) -> Path:
     """
     Runs training with sampling over teacher forcing.
@@ -53,15 +51,14 @@ def run_training(
     leaving less teacher invovlement in later epochs. 
 
     Args:
-        data (DataLoader): [description]
+        data (Dataset): A PyTorch dataset class.
         epoch (int): The number of training iterations.
         k (float)): The scale parameter for the sampling probability decay.
         path_to_save_model (str): [description]
         path_to_save_loss (str): [description]
         path_to_save_predictions (str): [description]
-        device ([type]): [description]
     """
-    device = torch.device(device)
+    device = torch.device(data.device)
     features = data.features
     raw_features = data.raw_features
     targets = data.targets
@@ -69,8 +66,7 @@ def run_training(
 
     model = TransformerSeries(
             feature_size=len(features),
-            output_size=len(targets),
-            attn_heads=attn_heads
+            output_size=len(targets)
         ).double().to(device)
     dataloader = DataLoader(data, batch_size=1, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters())
@@ -101,7 +97,6 @@ def run_training(
                 else:
                     p = sigmoid_decay(epoch, scale=k)
                     coin_heads = coin_flip(p)
-
 
                 if coin_heads:   # updates the training sample to include next true value                               
                     sampled_X = torch.cat((                    
@@ -144,7 +139,7 @@ def run_training(
             for i, target in enumerate(targets):
                 writer.add_figure(
                         f"train_plot_'{target}'@epoch-{epoch}", 
-                        plot_training(X_dates, X[:, i], sampled_X[:, i], pred[:, i], epoch), 
+                        plot_teacher_forcing(X_dates, X[:, i], sampled_X[:, i], pred[:, i], epoch), 
                         epoch
                     )
  

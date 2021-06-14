@@ -128,7 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-data/*
-models/*
+train/data/*
+train/models/*
+serve/*
 *.joblib
 .DS_Store

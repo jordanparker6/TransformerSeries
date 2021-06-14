@@ -1,5 +1,7 @@
+import argparse
 import pandas as pd
 import numpy as np
+import ast
 from pathlib import Path
 from typing import List
 import joblib
@@ -107,6 +109,10 @@ class TimeSeriesDataset(Dataset):
         self.features = self.raw_features + position_encoded
         self.targets = targets
 
+        self.device = "cpu"
+        if torch.cuda.is_available():
+            self.device = "gpu"
+
     def __len__(self):
         """Returns the number or groups."""
         return len(self.df.groupby(by=["group_id"]))
@@ -149,11 +155,21 @@ class TimeSeriesDataset(Dataset):
         X = X[:, :, 0:n].detach().squeeze()
         if shape[2] < n:
             padding = torch.zeros((shape[0], n - shape[2]))
-            X = torch.cat((X, padding), dim=1).cpu()
+            X = torch.cat((X, padding), dim=1).to(self.device)
         return scaler.inverse_transform(X) 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='CLI to execute data preprocessing.')
+    parser.add_argument("--csv_file", type=str)
+    parser.add_argument("--date_column", type=str, default="date")
+    parser.add_argument("--group_columns", type=str, default="[]")
+    args = parser.parse_args()
+
     processor = TimeSeriesPreprocessor(config.DATA_DIR)
-    train, test = processor("data/MSFT.csv", "Date")
+    train, test = processor(
+            args.csv_file, 
+            args.date_column,
+            ast.literal_eval(args.group_columns)
+        )
     print(train.head())
     print(test.head())

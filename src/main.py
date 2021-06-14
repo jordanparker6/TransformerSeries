@@ -1,20 +1,15 @@
+from typing import List
 import os
 import shutil
-import argparse
 import logging
-from torch.utils.data import DataLoader
 from pathlib import Path
 
 import config
 from dataset import TimeSeriesDataset
 from train import run_training
-from predict import predict
+from evaluate import evaluate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] | %(name)s | %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]")
-data_dir = config.DATA_DIR
-model_dir = config.MODEL_DIR
-predictions_dir = config.MODEL_DIR.joinpath("predictions")
-logs_dir = config.MODEL_DIR.joinpath("logs")
 
 def cleanup(_dir: Path):
     if os.path.exists(_dir): 
@@ -22,58 +17,49 @@ def cleanup(_dir: Path):
     os.mkdir(_dir)
 
 def main(
-    epochs: int = 1000,
-    k: int = 60,
-    batch_size: int = 1,
-    training_length: int = 30 * 3,
-    forecast_window: int = 30,
-    initial_teacher_period: int = 30,
-    device: str = "cpu"
+    targets: List[str] = config.DATASET["targets"],
+    batch_size: int = config.DATASET["batch_size"],
+    training_length: int = config.DATASET["training_length"],
+    forecast_window: int = config.DATASET["forecast_window"],
+    epochs: int = config.MODEL["epochs"],
+    initial_teacher_period: int = config.MODEL["initial_teacher_period"],
+    k: int = config.MODEL["teacher_sampling_decay"],
+    model_dir: Path = config.MODEL_DIR,
+    data_dir: Path = config.DATA_DIR,
+    serve_dir: Path = config.SERVE_DIR
 ):
     """Method to bring together clean-up, data-loading, pre-processing and training"""
-    list(map(cleanup, [model_dir, predictions_dir, logs_dir]))
+    list(map(cleanup, [
+        model_dir, 
+        model_dir.joinpath("predictions"), 
+        model_dir.joinpath("logs")
+    ]))
 
     train_dataset = TimeSeriesDataset(
-            csv_file = data_dir.joinpath("train.csv"),
-            targets=["Open", "High", "Low", "Close"],
+            csv_file=data_dir.joinpath("train.csv"),
+            targets=targets,
             training_length = training_length, 
             forecast_window = forecast_window
         )
     test_dataset = TimeSeriesDataset(
-            csv_file = data_dir.joinpath("test.csv"),
-            targets=["Open", "High", "Low", "Close"],
-            training_length = training_length,
-            forecast_window = forecast_window
+            csv_file=data_dir.joinpath("test.csv"),
+            targets=targets,
+            training_length=training_length,
+            forecast_window=forecast_window
         )
     best_model = run_training(
             data=train_dataset, 
-            epochs=epochs, 
-            attn_heads=len(train_dataset.features),
+            epochs=epochs,
             k=k, 
             initial_teacher_period=initial_teacher_period,
-            model_dir=model_dir, 
-            device=device
+            model_dir=model_dir
         )
-    predict(
+    evaluate(
             data=test_dataset, 
             model_path=best_model,
-            attn_heads=len(train_dataset.features),
-            forecast_window=forecast_window, 
-            predictions_dir=predictions_dir,
-            device=device
+            forecast_window=forecast_window
         )
+    shutil.copyfile(best_model, serve_dir.joinpath("model.pth"))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=1000)
-    parser.add_argument("--k", type=int, default=60)
-    parser.add_argument("--batch_size", type=int, default=1)
-    parser.add_argument("--device", type=str, default="cpu")
-    args = parser.parse_args()
-
-    main(
-        epochs=args.epochs,
-        k=args.k,
-        batch_size=args.batch_size,
-        device=args.device,
-    )
+    main()

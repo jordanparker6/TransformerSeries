@@ -14,15 +14,12 @@ logger = logging.getLogger(__name__)
 log_dir = config.MODEL_DIR.joinpath("logs")
 writer = SummaryWriter(config.MODEL_DIR.joinpath("logs"), comment="test")
 
-def predict(
+def evaluate(
         data: Dataset,
         model_path: Path,
-        attn_heads: int,
-        forecast_window: int,
-        device: str, 
-        predictions_dir: str, 
+        forecast_window: int
     ):
-    device = torch.device(device)
+    device = torch.device(data.device)
     features = data.features
     raw_features = data.raw_features
     targets = data.targets
@@ -31,8 +28,7 @@ def predict(
     dataloader = DataLoader(data, batch_size=1, shuffle=True)
     model = TransformerSeries(
             feature_size=len(features),
-            output_size=len(targets),
-            attn_heads=attn_heads
+            output_size=len(targets)
         ).double().to(device)
     model.load_state_dict(torch.load(model_path))
     criterion = torch.nn.MSELoss()
@@ -71,7 +67,6 @@ def predict(
                 loss = criterion(true, all_pred[:,:, 0:len(targets)])
                 val_loss += loss
             
-            val_loss = val_loss / 10
             all_val_loss.append(val_loss)
             logger.info(f"Sample: {plot}, Validation loss: {val_loss}")
             writer.add_scalar("validation_loss", val_loss, plot)
