@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 
 import config
-from model import TransformerSeries
+import models
 from plot import plot_teacher_forcing
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,8 @@ def sigmoid_decay(x: float, scale: float):
 ## Training Function ####
 #########################
 
-def run_training(
+def run_teacher_forcing_training(
+        model_name: str,
         data: Dataset, 
         epochs: int,
         k: float,
@@ -58,20 +59,18 @@ def run_training(
         path_to_save_loss (str): [description]
         path_to_save_predictions (str): [description]
     """
-    device = torch.device(data.device)
+    device = torch.device(config.DEVICE)
     features = data.features
     raw_features = data.raw_features
     targets = data.targets
     date_index = data.dates
 
-    model = TransformerSeries(
-            feature_size=len(features),
-            output_size=len(targets)
-        ).double().to(device)
+    model = models.ALL[model_name]
+    model = model(feature_size=len(features), output_size=len(targets)).double().to(device)
     dataloader = DataLoader(data, batch_size=1, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=200)
-    criterion = torch.nn.MSELoss()
+    criterion = config.METRICS[config.MODEL["loss"]]
     best_model = ""
     min_train_loss = float('inf')
 
@@ -89,7 +88,7 @@ def run_training(
             sampled_X = X[:1, :, :]   
                                 
             for i in range(len(Y)-1):
-                pred = model(sampled_X, device)
+                pred = model(sampled_X)
 
                 # if coin is heads, training will use the last true value
                 if i < initial_teacher_period:
@@ -115,7 +114,7 @@ def run_training(
             scheduler.step(loss.detach().item())
             train_loss += loss.detach().item()
 
-        writer.add_scalar("train_loss", train_loss, epoch)
+        writer.add_scalar(f"{model_name}_train_loss", train_loss, epoch)
 
         # Save the best model
         if train_loss < min_train_loss:
@@ -126,7 +125,7 @@ def run_training(
             min_train_loss = train_loss
         
         if epoch % 10 == 0: # log training
-            logger.info(f"Epoch: {epoch}, Training loss: {train_loss}")
+            logger.info(f"{model_name} | Epoch: {epoch}, Training loss: {train_loss}")
 
         if epoch % 100 == 0:
             scalar = joblib.load('scalar_item.joblib')
@@ -138,7 +137,7 @@ def run_training(
             Y_dates = date_index[X_i.tolist()[0]][1:].tolist()
             for i, target in enumerate(targets):
                 writer.add_figure(
-                        f"train_plot_'{target}'@epoch-{epoch}", 
+                        f"{model_name}_train_plot_'{target}'@epoch-{epoch}", 
                         plot_teacher_forcing(X_dates, X[:, i], sampled_X[:, i], pred[:, i], epoch), 
                         epoch
                     )

@@ -54,6 +54,7 @@ class TimeSeriesPreprocessor:
         df['sin_month'] = np.sin(2 * np.pi * month)
         df['cos_month'] = np.cos(2 * np.pi * month)
         df['year'] = year
+        # could also add day of week, week of year
         df['timestamp'] = df[date_column]
         df = df.drop(columns=[date_column]).set_index("timestamp")
         return df
@@ -99,7 +100,7 @@ class TimeSeriesDataset(Dataset):
         df = pd.read_csv(csv_file, parse_dates=["timestamp"]).reset_index(drop=True)
         self.dates = df["timestamp"]
         self.df = df.drop(columns=["timestamp"])
-        self.scaler = MinMaxScaler()
+        self.scaler = MinMaxScaler()                    # could make this also NormScaler
         self.T = training_length
         self.S = forecast_window
         
@@ -108,10 +109,6 @@ class TimeSeriesDataset(Dataset):
         self.raw_features = [col for col in cols if col not in position_encoded]
         self.features = self.raw_features + position_encoded
         self.targets = targets
-
-        self.device = "cpu"
-        if torch.cuda.is_available():
-            self.device = "gpu"
 
     def __len__(self):
         """Returns the number or groups."""
@@ -155,7 +152,7 @@ class TimeSeriesDataset(Dataset):
         X = X[:, :, 0:n].detach().squeeze()
         if shape[2] < n:
             padding = torch.zeros((shape[0], n - shape[2]))
-            X = torch.cat((X, padding), dim=1).to(self.device)
+            X = torch.cat((X, padding), dim=1).to(config.DEVICE)
         return scaler.inverse_transform(X) 
 
 if __name__ == "__main__":

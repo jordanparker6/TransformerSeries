@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 import config
-from model import TransformerSeries
+import models
 from plot import plot_prediction
 
 logger = logging.getLogger(__name__)
@@ -15,33 +15,34 @@ log_dir = config.MODEL_DIR.joinpath("logs")
 writer = SummaryWriter(config.MODEL_DIR.joinpath("logs"), comment="test")
 
 def evaluate(
+        model_name: str,
         data: Dataset,
         model_path: Path,
         forecast_window: int
     ):
-    device = torch.device(data.device)
+    ## could move this into train and pick the best model on the evaluation dataset
+
+    device = torch.device(config.DEVICE)
     features = data.features
     raw_features = data.raw_features
     targets = data.targets
     date_index = data.dates
 
     dataloader = DataLoader(data, batch_size=1, shuffle=True)
-    model = TransformerSeries(
-            feature_size=len(features),
-            output_size=len(targets)
-        ).double().to(device)
+    model = models.ALL[model_name]
+    model = model(feature_size=len(features), output_size=len(targets)).double().to(device)
     model.load_state_dict(torch.load(model_path))
-    criterion = torch.nn.MSELoss()
 
     with torch.no_grad():
         model.eval()
 
         all_val_loss = []
+        all_metrics = { k: [] for k in config.MODEL["metrics"] }
         for plot in range(25):
-            val_loss = 0
+            metrics = { k: 0 for k in config.MODEL["metrics"] }
+            
             for X_i, Y_i, X, Y, group in dataloader:
         
-                #X = X.permute(1,0,2).double().to(device)[1:, :, :]
                 X = X.permute(1,0,2).double().to(device)[1:, :, :]
                 Y = Y.permute(1,0,2).double().to(device)
 
@@ -49,7 +50,7 @@ def evaluate(
                 all_pred = []
 
                 for i in range(forecast_window - 1):
-                    pred = model(next_input, device)
+                    pred = model(next_input)
 
                     if all_pred == []:
                         all_pred = pred
@@ -64,12 +65,15 @@ def evaluate(
                     next_input = torch.cat((next_input, new_features), dim = 2)
 
                 true = torch.cat((X[1:,:,0:len(targets)], Y[:-1,:,0:len(targets)]))
-                loss = criterion(true, all_pred[:,:, 0:len(targets)])
-                val_loss += loss
-            
-            all_val_loss.append(val_loss)
-            logger.info(f"Sample: {plot}, Validation loss: {val_loss}")
-            writer.add_scalar("validation_loss", val_loss, plot)
+                for metric in config.MODEL["metrics"]:
+                    metrics[metric] += config.METRICS[metric](true, all_pred[:,:, 0:len(targets)])
+
+            all_metrics = { k: v + [metrics[k]] for k, v in all_metrics.items() }
+            logstr = f"{model_name} | Sample: {plot}, "
+            for k, v in metrics.items():
+                logstr += f"| Validation {k}: {metrics[k]} "
+                writer.add_scalar("k", v, plot)
+            logger.info(logstr)
             
             if plot % 5 == 0:
                 scalar = joblib.load('scalar_item.joblib')
@@ -81,10 +85,11 @@ def evaluate(
 
                 for i, target in enumerate(targets):
                     writer.add_figure(
-                            f"test_plot_'{target}'@sample-{plot}", 
+                            f"{model_name}_test_plot_'{target}'@sample-{plot}", 
                             plot_prediction(X[:, i], Y[:, i], all_pred[:, i], X_dates, Y_dates), 
                             plot
                         )
 
-        all_val_loss = torch.cat([x.unsqueeze(0) for x in all_val_loss])
-        logger.info(f"Average Validation Loss: {all_val_loss.mean()}")
+        all_metrics = { k: torch.cat([x.unsqueeze(0) for x in v]) for k, v in all_metrics.items() }
+        for k, v in all_metrics.items():
+            logger.info(f"{model_name} | Average Validation {k}: {v.mean()}")

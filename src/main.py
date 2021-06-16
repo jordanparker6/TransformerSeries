@@ -6,7 +6,7 @@ from pathlib import Path
 
 import config
 from dataset import TimeSeriesDataset
-from train import run_training
+from train import run_teacher_forcing_training
 from evaluate import evaluate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] | %(name)s | %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]")
@@ -17,6 +17,7 @@ def cleanup(_dir: Path):
     os.mkdir(_dir)
 
 def main(
+    model_name: str = config.MODEL["model"],
     targets: List[str] = config.DATASET["targets"],
     batch_size: int = config.DATASET["batch_size"],
     training_length: int = config.DATASET["training_length"],
@@ -47,7 +48,8 @@ def main(
             training_length=training_length,
             forecast_window=forecast_window
         )
-    best_model = run_training(
+    best_model_path = run_teacher_forcing_training(
+            model_name=model_name,
             data=train_dataset, 
             epochs=epochs,
             k=k, 
@@ -55,11 +57,13 @@ def main(
             model_dir=model_dir
         )
     evaluate(
+            model_name=model_name,
             data=test_dataset, 
-            model_path=best_model,
+            model_path=best_model_path,
             forecast_window=forecast_window
         )
-    shutil.copyfile(best_model, serve_dir.joinpath("model.pth"))
+    shutil.copyfile(best_model_path, serve_dir.joinpath(f"{model_name}_model.pth"))
 
 if __name__ == "__main__":
-    main()
+    for model in ["transformer", "lstm"]:
+        main(model_name=model, model_dir=config.MODEL_DIR.joinpath(model))
