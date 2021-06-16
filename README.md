@@ -4,12 +4,18 @@ A general purpose implementation of the Transformer architecture for multi-varia
 
 ### Quick Start
 
-To preprocess your csv file, runt the comand below with the following:
+To preprocess your csv file, run the comand below with the following:
 - The path of your csv file
 - The name of the data column in the csv
 - A string representation of a list of columns names containing all of columns that categorise a unqiue timeseries.
 
-`python src/dataset.py --csv_file {path} --data_column {column_name} --group_columns {"["list", "of", "column", "names"]"}`
+```
+python src/dataset.py --csv_file {path} 
+    // --date_column {column_name} 
+    // --group_columns {"["list", "of", "column", "names"]"}
+```
+
+If not date_column  or group_columns is provided, the default is "date" and None respectively.
 
 Run the following command to train the model.
 

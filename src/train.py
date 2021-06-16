@@ -14,7 +14,6 @@ from plot import plot_teacher_forcing
 
 logger = logging.getLogger(__name__)
 log_dir = config.MODEL_DIR.joinpath("logs")
-writer = SummaryWriter(config.MODEL_DIR.joinpath("logs"), comment="training")
 
 #########################
 ## Utility Functions ####
@@ -73,6 +72,7 @@ def run_teacher_forcing_training(
     criterion = config.METRICS[config.MODEL["loss"]]
     best_model = ""
     min_train_loss = float('inf')
+    writer = SummaryWriter(model_dir.joinpath("logs"), comment="training")
 
     for epoch in range(epochs + 1):
         train_loss = 0
@@ -80,6 +80,7 @@ def run_teacher_forcing_training(
         for X_i, Y_i, _X, _Y, group in dataloader:
             optimizer.zero_grad()
             
+            # Dataloader --> Model
             # Permute: [batch, input_length, feature] --> [input_length, batch, feature]
             X = _X.permute(1,0,2).double().to(device)[:-1,:,:]  # training data shifted left by 1.
             Y = _X.permute(1,0,2).double().to(device)[1:,:,:]   # training shifted right by 1.

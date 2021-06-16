@@ -60,10 +60,11 @@ def main(
             model_name=model_name,
             data=test_dataset, 
             model_path=best_model_path,
-            forecast_window=forecast_window
+            forecast_window=forecast_window,
+            model_dir=model_dir
         )
     shutil.copyfile(best_model_path, serve_dir.joinpath(f"{model_name}_model.pth"))
 
 if __name__ == "__main__":
-    for model in ["transformer", "lstm"]:
+    for model in ["baseline", "transformer", "lstm"]:
         main(model_name=model, model_dir=config.MODEL_DIR.joinpath(model))

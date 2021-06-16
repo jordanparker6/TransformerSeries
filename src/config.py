@@ -23,6 +23,7 @@ DATASET = {
 MODEL = {
     "model": "transformer",
     "task": "regression",
+    "epochs": int(os.getenv("MODEL_EPOCHS", 1000)),
     "transformer": {
         "num_layers": int(os.getenv("MODEL_TRANSFORMER_LAYERS", 3)),
         "attn_heads": int(os.getenv("MODEL_TRANSFORMER_ATTN_HEADS", 1)),
@@ -33,11 +34,10 @@ MODEL = {
         "layers": int(os.getenv("MODEL_LSTM_LAYERS", 2)),
     },
     "dropout": float(os.getenv("MODEL_DROPOUT", 0.1)),
-    "epochs": int(os.getenv("MODEL_EPOCHS", 100)),
     "initial_teacher_period": int(os.getenv("MODEL_INIT_TEACHER_PERIOD", 30)),
     "teacher_sampling_decay": float(os.getenv("MODEL_TEACHER_SAMPLE_DECAY", 60)),
     "loss": "MSE",
-    "metrics": ["MAPE", "MSE"]
+    "metrics": ["MAE", "MSE"]
 }
 
 # ~~~~~ GLOBAL METRICS OBJECT ~~~~~

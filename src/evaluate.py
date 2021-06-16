@@ -18,7 +18,8 @@ def evaluate(
         model_name: str,
         data: Dataset,
         model_path: Path,
-        forecast_window: int
+        forecast_window: int,
+        model_dir: Path
     ):
     ## could move this into train and pick the best model on the evaluation dataset
 
@@ -32,6 +33,7 @@ def evaluate(
     model = models.ALL[model_name]
     model = model(feature_size=len(features), output_size=len(targets)).double().to(device)
     model.load_state_dict(torch.load(model_path))
+    writer = SummaryWriter(model_dir.joinpath("logs"), comment="training")
 
     with torch.no_grad():
         model.eval()
@@ -72,7 +74,7 @@ def evaluate(
             logstr = f"{model_name} | Sample: {plot}, "
             for k, v in metrics.items():
                 logstr += f"| Validation {k}: {metrics[k]} "
-                writer.add_scalar("k", v, plot)
+                writer.add_scalar(f"Evaluation {k}", v, plot)
             logger.info(logstr)
             
             if plot % 5 == 0:

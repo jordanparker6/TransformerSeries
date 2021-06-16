@@ -7,11 +7,14 @@ class Baseline(nn.Module):
     """
     A naive baseline model for benchmarking.
 
-    The baseline model will use the input mean to predict each value 
-    in the forecast window.
+    The baseline model will learn a linear combination of the input features.
     """
+    def __init__(self, feature_size: int, output_size: int):
+        super().__init__()
+        self.linear = nn.Linear(feature_size, output_size)
+
     def forward(self, X):
-        return X.mean()
+        return self.linear(X)
 
 class TransformerSeries(nn.Module):
     """
@@ -60,7 +63,11 @@ class TransformerSeries(nn.Module):
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def forward(self, X: torch.Tensor) -> torch.Tensor:  
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            X (torch.Tensor): shape --> [batch, input_size, feature_size]
+        """
         mask = self._generate_square_subsequent_mask(len(X)).to(config.DEVICE)
         output = self.transformer_encoder(X, mask)
         output = self.decoder_1(output)
@@ -86,21 +93,25 @@ class LSTM(nn.Module):
         self.output_size = output_size
         self.hidden_states = hidden_states
         self.lstm_layers = layers
-        self.lstm = torch.nn.LSTM(feature_size, hidden_states, layers, bias, batch_first=True)
+        self.batch_size = batch_size
+        self.lstm = torch.nn.LSTM(feature_size, hidden_states, layers, bias)
         self.final_layer = nn.Linear(hidden_states, output_size)
-        self.init_hidden(batch_size)
+        self.hidden = self.init_hidden(batch_size)
 
     def init_hidden(self, batch_size: int):
-        self.hidden = (
-                torch.zeros(self.lstm_layers, batch_size, self.hidden_states), 
-                torch.zeros(self.lstm_layers, batch_size, self.hidden_states)
+        return (
+                torch.zeros(self.lstm_layers, batch_size, self.hidden_states),  # h_n hidden state
+                torch.zeros(self.lstm_layers, batch_size, self.hidden_states)   # c_n final cell state
             )
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
-        batch_size = X.size()[0]
-        self.init_hidden(batch_size)
-        output, self.hidden = self.lstm(X, self.hidden)
-        output = self.linear(output.contiguous().view(batch_size, -1))
+        """
+        Args:
+            X (torch.Tensor): shape --> [batch, input_size, feature_size]
+        """
+        hn, cn = self.hidden
+        output, self.hidden = self.lstm(X, (hn.detach().double(), cn.detach().double()))
+        output = self.final_layer(output)
         return output
 
 ALL = {
