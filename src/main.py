@@ -5,8 +5,8 @@ import logging
 from pathlib import Path
 
 import config
+import train
 from dataset import TimeSeriesDataset
-from train import run_teacher_forcing_training
 from evaluate import evaluate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] | %(name)s | %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]")
@@ -48,7 +48,7 @@ def main(
             training_length=training_length,
             forecast_window=forecast_window
         )
-    best_model_path = run_teacher_forcing_training(
+    best_model_path = train.run_teacher_forcing_training(
             model_name=model_name,
             data=train_dataset, 
             epochs=epochs,

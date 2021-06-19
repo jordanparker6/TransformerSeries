@@ -1,5 +1,8 @@
 make tensorboard:
 	tensorboard --logdir=train/models
 
-make train:
+make training:
 	python3 src/main.py
+
+tests:
+	pytest src

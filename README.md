@@ -10,9 +10,10 @@ To preprocess your csv file, run the comand below with the following:
 - A string representation of a list of columns names containing all of columns that categorise a unqiue timeseries.
 
 ```
-python src/dataset.py --csv_file {path} 
-    // --date_column {column_name} 
-    // --group_columns {"["list", "of", "column", "names"]"}
+python src/dataset.py 
+    // --csv_file path
+    // --date_column column_name
+    // --group_columns "['list', 'of', 'column', 'names']"
 ```
 
 If not date_column  or group_columns is provided, the default is "date" and None respectively.

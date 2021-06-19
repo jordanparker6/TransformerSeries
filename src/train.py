@@ -133,10 +133,20 @@ def run_teacher_forcing_training(
             sampled_X = data.inverse_transform(sampled_X, scalar)
             X = data.inverse_transform(X, scalar)
             Y = data.inverse_transform(Y, scalar)
+            
+            print(pred.shape)
+            print(pred)
+
             pred = data.inverse_transform(pred, scalar)
             X_dates = date_index[X_i.tolist()[0]][:-1].tolist()
             Y_dates = date_index[X_i.tolist()[0]][1:].tolist()
             for i, target in enumerate(targets):
+                print(target)
+                print(i)
+                print(X.shape)
+                print(X[:, i])
+                print(pred.shape)
+                print(pred[:, i])
                 writer.add_figure(
                         f"{model_name}_train_plot_'{target}'@epoch-{epoch}", 
                         plot_teacher_forcing(X_dates, X[:, i], sampled_X[:, i], pred[:, i], epoch), 

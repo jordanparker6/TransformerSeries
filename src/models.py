@@ -40,11 +40,13 @@ class TransformerSeries(nn.Module):
             dropout (float, optional): The dropout probability. Defaults to 0.
         """
         super(TransformerSeries, self).__init__()
-        self.layer_norm = nn.LayerNorm(feature_size)
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=feature_size, nhead=attn_heads, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers, norm=self.layer_norm)        
-        self.decoder_1 = nn.Linear(feature_size, 2048)
-        self.decoder_2 = nn.Linear(2048, output_size) 
+        self.transformer_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=feature_size, nhead=attn_heads, dropout=dropout), 
+            num_layers=num_layers, 
+            norm=nn.LayerNorm(feature_size)
+        )        
+        self.decoder = nn.Linear(feature_size, 2048)
+        self.final_layer = nn.Linear(2048, output_size) 
         self.init_weights()
 
     def init_weights(self, initrange: float = 0.1):
@@ -53,10 +55,10 @@ class TransformerSeries(nn.Module):
         Args:
             initrange (float, optional): The initial weight range +/-. Defaults to 0.1.
         """
-        self.decoder_1.bias.data.zero_()
-        self.decoder_1.weight.data.uniform_(-initrange, initrange)
-        self.decoder_2.bias.data.zero_()
-        self.decoder_2.weight.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
+        self.final_layer.bias.data.zero_()
+        self.final_layer.weight.data.uniform_(-initrange, initrange)
 
     def _generate_square_subsequent_mask(self, size: int) -> torch.Tensor:
         mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
@@ -70,9 +72,8 @@ class TransformerSeries(nn.Module):
         """
         mask = self._generate_square_subsequent_mask(len(X)).to(config.DEVICE)
         output = self.transformer_encoder(X, mask)
-        output = self.decoder_1(output)
-        output = self.decoder_2(output)
-        return output
+        output = self.decoder(output)
+        return self.final_layer(output)
 
 class LSTM(nn.Module):
     """
@@ -111,8 +112,7 @@ class LSTM(nn.Module):
         """
         hn, cn = self.hidden
         output, self.hidden = self.lstm(X, (hn.detach().double(), cn.detach().double()))
-        output = self.final_layer(output)
-        return output
+        return self.final_layer(output)
 
 ALL = {
     "transformer": TransformerSeries,

@@ -13,9 +13,9 @@ SERVE_DIR: str = Path(os.getenv('MODEL_DIR', './serve'))
 
 # ~~~~~ DATASET CONFIG ~~~~~
 DATASET = {
-    "targets": ["Open", "High", "Low", "Close"],
-    "training_length": 90,
-    "forecast_window": 30,
+    "targets": ["kw"],
+    "training_length": 168,
+    "forecast_window": 24,
     "batch_size": 1
 }
 

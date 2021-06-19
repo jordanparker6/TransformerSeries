@@ -32,6 +32,7 @@ class TimeSeriesPreprocessor:
         train, test = self.test_train_split_by_groups(df, group_columns)
         train.to_csv(self.dir.joinpath("train_raw.csv"))
         test.to_csv(self.dir.joinpath("test_raw.csv"))
+        group_columns = [x for x in group_columns if x != "group_id"]
         train = train.drop(columns=group_columns)
         test = test.drop(columns=group_columns)
         train.to_csv(self.dir.joinpath("train.csv"))
@@ -98,7 +99,13 @@ class TimeSeriesDataset(Dataset):
             forecast_window (int): The forecast window for predictions.
         """
         df = pd.read_csv(csv_file, parse_dates=["timestamp"]).reset_index(drop=True)
+
+        assert "timestamp" in df.columns, "Column 'timestamp' does not exist. Please ensure the dataset has been preprocessed."
+        assert "group_id" in df.columns, "Column 'group_id' does not exist. Please ensure the dataset has been preprocessed."
+        assert all(x in df.columns for x in config.DATASET["targets"]), "A target column doesn't exist in the dataset."
+
         self.dates = df["timestamp"]
+        self.groups = df["group_id"].unique().tolist()
         self.df = df.drop(columns=["timestamp"])
         self.scaler = MinMaxScaler()                    # could make this also NormScaler
         self.T = training_length
@@ -119,10 +126,10 @@ class TimeSeriesDataset(Dataset):
         Randomly pulls a timeseries for each group.
         The lenght of the timeseries X, Y is the training length and forecast window.
         """
-        start = np.random.randint(0, len(self.df[self.df["group_id"] == idx]) - self.T - self.S) 
+        group = self.groups[idx]
+        start = np.random.randint(0, len(self.df[self.df["group_id"] == group]) - self.T - self.S) 
 
-        group_df = self.df.loc[self.df["group_id"] == idx, self.features]
-        group = self.df.loc[self.df["group_id"] == idx, ["group_id"]][ start : start + 1].values.item()
+        group_df = self.df.loc[self.df["group_id"] == group, self.features]
         
         X = group_df[start : start + self.T]
         Y = group_df[start + self.T : start + self.T + self.S]
@@ -134,7 +141,7 @@ class TimeSeriesDataset(Dataset):
 
         X, Y = self.transform(X, Y)
         
-        return X_i, Y_i, X, Y, group
+        return X_i, Y_i, X, Y, idx
 
     def transform(self, X, Y):
         """Transforms the scale of the X, y with X to avoid target leakage."""
