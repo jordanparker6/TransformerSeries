@@ -133,3 +133,4 @@ train/models/*
 serve/*
 *.joblib
 .DS_Store
+unittest/model/*

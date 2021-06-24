@@ -57,7 +57,9 @@ class TimeSeriesPreprocessor:
         df['year'] = year
         # could also add day of week, week of year
         df['timestamp'] = df[date_column]
-        df = df.drop(columns=[date_column]).set_index("timestamp")
+        if date_column != "timestamp":
+            df.drop(columns=[date_column])
+        df = df.set_index("timestamp")
         return df
 
     def test_train_split_by_groups(self, df: pd.DataFrame, group_columns: List):
@@ -99,10 +101,12 @@ class TimeSeriesDataset(Dataset):
             forecast_window (int): The forecast window for predictions.
         """
         df = pd.read_csv(csv_file, parse_dates=["timestamp"]).reset_index(drop=True)
+        position_encoded = ["sin_hour", "cos_hour", "sin_day", "cos_day", "sin_month", "cos_month"]
 
         assert "timestamp" in df.columns, "Column 'timestamp' does not exist. Please ensure the dataset has been preprocessed."
         assert "group_id" in df.columns, "Column 'group_id' does not exist. Please ensure the dataset has been preprocessed."
-        assert all(x in df.columns for x in config.DATASET["targets"]), "A target column doesn't exist in the dataset."
+        assert all(x in df.columns for x in targets), "A target column doesn't exist in the dataset."
+        assert all(x in df.columns for x in position_encoded), "The target dataset has not been position encoded. Please ensure the dataset has been preprocessed"
 
         self.dates = df["timestamp"]
         self.groups = df["group_id"].unique().tolist()
@@ -112,7 +116,6 @@ class TimeSeriesDataset(Dataset):
         self.S = forecast_window
         
         cols = [col for col in self.df.columns if col not in ["group_id"]]
-        position_encoded = ["sin_hour", "cos_hour", "sin_day", "cos_day", "sin_month", "cos_month"]
         self.raw_features = [col for col in cols if col not in position_encoded]
         self.features = self.raw_features + position_encoded
         self.targets = targets
@@ -155,7 +158,9 @@ class TimeSeriesDataset(Dataset):
 
     def inverse_transform(self, X, scaler):
         n, shape = len(self.raw_features), X.shape
-        assert len(shape) == 3
+        assert len(shape) == 3, "Tensor must be of form [nsamples, batch, features]."
+        assert shape[2] == len(self.features), "Dim 2 does not equal feature size."
+
         X = X[:, :, 0:n].detach().squeeze()
         if shape[2] < n:
             padding = torch.zeros((shape[0], n - shape[2]))
@@ -167,9 +172,10 @@ if __name__ == "__main__":
     parser.add_argument("--csv_file", type=str)
     parser.add_argument("--date_column", type=str, default="date")
     parser.add_argument("--group_columns", type=str, default="[]")
+
     args = parser.parse_args()
 
-    processor = TimeSeriesPreprocessor(config.DATA_DIR)
+    processor = TimeSeriesPreprocessor(Path())
     train, test = processor(
             args.csv_file, 
             args.date_column,

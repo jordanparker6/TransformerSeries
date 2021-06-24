@@ -130,13 +130,14 @@ def run_teacher_forcing_training(
 
         if epoch % 100 == 0:
             scalar = joblib.load('scalar_item.joblib')
-            sampled_X = data.inverse_transform(sampled_X, scalar)
+            try:
+                sampled_X = data.inverse_transform(sampled_X, scalar)
+            except AssertionError as e:
+                print(e)
+                print(sampled_X)
+                print(sampled_X.shape)
             X = data.inverse_transform(X, scalar)
             Y = data.inverse_transform(Y, scalar)
-            
-            print(pred.shape)
-            print(pred)
-
             pred = data.inverse_transform(pred, scalar)
             X_dates = date_index[X_i.tolist()[0]][:-1].tolist()
             Y_dates = date_index[X_i.tolist()[0]][1:].tolist()

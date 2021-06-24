@@ -48,3 +48,10 @@ The main focus of this repo is the exploration of Transformer architecture for t
 However, the following models are also included for benchmarking purposes:
  - A Baseline heuristic model
  - A vanila LSTM model with a dense final layer
+
+
+
+## To Do
+
+- Weights & Bias integration for hyperparameter tuning
+- Pulumi Integration for model serving Infra as Code

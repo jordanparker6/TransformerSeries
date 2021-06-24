@@ -14,6 +14,7 @@ class Baseline(nn.Module):
         self.linear = nn.Linear(feature_size, output_size)
 
     def forward(self, X):
+        assert len(X.shape) == 3, "Tensor must be of form [nsamples, batch, features]."
         return self.linear(X)
 
 class TransformerSeries(nn.Module):
@@ -68,8 +69,9 @@ class TransformerSeries(nn.Module):
     def forward(self, X: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            X (torch.Tensor): shape --> [batch, input_size, feature_size]
+            X (torch.Tensor): shape --> [input_size, batch, feature_size]
         """
+        assert len(X.shape) == 3, "Tensor must be of form [nsamples, batch, features]."
         mask = self._generate_square_subsequent_mask(len(X)).to(config.DEVICE)
         output = self.transformer_encoder(X, mask)
         output = self.decoder(output)
@@ -108,8 +110,9 @@ class LSTM(nn.Module):
     def forward(self, X: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            X (torch.Tensor): shape --> [batch, input_size, feature_size]
+            X (torch.Tensor): shape --> [input_size, batch, feature_size]
         """
+        assert len(X.shape) == 3, "Tensor must be of form [nsamples, batch, features]."
         hn, cn = self.hidden
         output, self.hidden = self.lstm(X, (hn.detach().double(), cn.detach().double()))
         return self.final_layer(output)
