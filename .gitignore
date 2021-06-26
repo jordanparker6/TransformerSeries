@@ -129,8 +129,11 @@ dmypy.json
 .pyre/
 
 train/data/*
+train/data_2/*
 train/models/*
 serve/*
 *.joblib
 .DS_Store
 unittest/model/*
+
+lightning_logs/*

@@ -1,15 +1,16 @@
 from typing import List
 import os
 import shutil
-import logging
 from pathlib import Path
+from torch.utils.data import DataLoader
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, GPUStatsMonitor
 
 import config
-import train
 from dataset import TimeSeriesDataset
-from evaluate import evaluate
+import models
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] | %(name)s | %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]")
+pl.seed_everything(42, workers=True)
 
 def cleanup(_dir: Path):
     if os.path.exists(_dir): 
@@ -36,35 +37,57 @@ def main(
         model_dir.joinpath("logs")
     ]))
 
+    callbacks = [
+        EarlyStopping(
+            monitor="val_loss",
+            stopping_threshold=1e-4,
+            divergence_threshold=9.0,
+            check_finite=True
+        ),
+        ModelCheckpoint(
+            monitor='val_loss',
+            dirpath=config.MODEL_DIR,
+            filename=model_name + '-epoch{epoch:02d}-val_loss{val_loss:.2f}',
+            auto_insert_metric_name=False
+        ),
+        GPUStatsMonitor()
+    ]
+
+
     train_dataset = TimeSeriesDataset(
             csv_file=data_dir.joinpath("train.csv"),
             targets=targets,
             training_length = training_length, 
             forecast_window = forecast_window
         )
-    test_dataset = TimeSeriesDataset(
+    val_dataset = TimeSeriesDataset(
             csv_file=data_dir.joinpath("test.csv"),
             targets=targets,
             training_length=training_length,
             forecast_window=forecast_window
         )
-    best_model_path = train.run_teacher_forcing_training(
-            model_name=model_name,
-            data=train_dataset, 
-            epochs=epochs,
-            k=k, 
-            initial_teacher_period=initial_teacher_period,
-            model_dir=model_dir
-        )
-    evaluate(
-            model_name=model_name,
-            data=test_dataset, 
-            model_path=best_model_path,
-            forecast_window=forecast_window,
-            model_dir=model_dir
-        )
-    shutil.copyfile(best_model_path, serve_dir.joinpath(f"{model_name}_model.pth"))
+    
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=config.DATASET["batch_size"],
+        num_workers=config.DATASET["num_workers"],
+        pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=config.DATASET["batch_size"],
+        num_workers=config.DATASET["num_workers"],
+        pin_memory=True
+    )
+    
+    model = models.Baseline(train_dataset).double()
+    trainer = pl.Trainer(gpus=1, callbacks=callbacks)
+    trainer.fit(model, train_loader, val_loader)
+
+
+    #shutil.copyfile(best_model_path, serve_dir.joinpath(f"{model_name}_model.pth"))
 
 if __name__ == "__main__":
-    for model in ["baseline", "transformer", "lstm"]:
-        main(model_name=model, model_dir=config.MODEL_DIR.joinpath(model))
+    import warnings
+    warnings.filterwarnings('ignore')
+    main()

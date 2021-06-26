@@ -1,3 +1,6 @@
+make install:
+	pip3 install -r requirements.txt
+
 make tensorboard:
 	tensorboard --logdir=train/models
 
@@ -6,3 +9,6 @@ make training:
 
 tests:
 	pytest src
+
+profile:
+	 python -m torch.utils.bottleneck src/main.py

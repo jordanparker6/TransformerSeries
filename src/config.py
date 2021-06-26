@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import torch
 
-DEVICE = "gpu" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ~~~~~ PATHS ~~~~~
 DATA_DIR: str = Path(os.getenv('DATA_DIR', './train/data'))
@@ -13,10 +13,11 @@ SERVE_DIR: str = Path(os.getenv('MODEL_DIR', './serve'))
 
 # ~~~~~ DATASET CONFIG ~~~~~
 DATASET = {
-    "targets": ["kw"],
-    "training_length": 168,
-    "forecast_window": 24,
-    "batch_size": 1
+    "targets": ["y1", "y2"],
+    "training_length": 7, #168
+    "forecast_window": 3, #24,
+    "batch_size": 1,
+    "num_workers": 4
 }
 
 # ~~~~~ MODEL CONFIG ~~~~~

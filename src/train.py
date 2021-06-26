@@ -66,7 +66,7 @@ def run_teacher_forcing_training(
 
     model = models.ALL[model_name]
     model = model(feature_size=len(features), output_size=len(targets)).double().to(device)
-    dataloader = DataLoader(data, batch_size=1, shuffle=True)
+    dataloader = DataLoader(data, batch_size=1, shuffle=True, num_workers=config.DATASET["num_workers"], pin_memory=True)
     optimizer = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=200)
     criterion = config.METRICS[config.MODEL["loss"]]
@@ -74,6 +74,7 @@ def run_teacher_forcing_training(
     min_train_loss = float('inf')
     writer = SummaryWriter(model_dir.joinpath("logs"), comment="training")
 
+    logger.info(f"{model_name} | Training Start: Device - {device}")
     for epoch in range(epochs + 1):
         train_loss = 0
         model.train()
@@ -130,24 +131,13 @@ def run_teacher_forcing_training(
 
         if epoch % 100 == 0:
             scalar = joblib.load('scalar_item.joblib')
-            try:
-                sampled_X = data.inverse_transform(sampled_X, scalar)
-            except AssertionError as e:
-                print(e)
-                print(sampled_X)
-                print(sampled_X.shape)
+            sampled_X = data.inverse_transform(sampled_X, scalar)
             X = data.inverse_transform(X, scalar)
             Y = data.inverse_transform(Y, scalar)
             pred = data.inverse_transform(pred, scalar)
             X_dates = date_index[X_i.tolist()[0]][:-1].tolist()
             Y_dates = date_index[X_i.tolist()[0]][1:].tolist()
             for i, target in enumerate(targets):
-                print(target)
-                print(i)
-                print(X.shape)
-                print(X[:, i])
-                print(pred.shape)
-                print(pred[:, i])
                 writer.add_figure(
                         f"{model_name}_train_plot_'{target}'@epoch-{epoch}", 
                         plot_teacher_forcing(X_dates, X[:, i], sampled_X[:, i], pred[:, i], epoch), 

@@ -5,7 +5,7 @@ A general purpose implementation of the Transformer architecture for multi-varia
 ### Quick Start
 
 To preprocess your csv file, run the comand below with the following:
-- The path of your csv file
+- The path of your csv file. Please note with gcsfs installed this can be a GCS object you have access to.
 - The name of the data column in the csv
 - A string representation of a list of columns names containing all of columns that categorise a unqiue timeseries.
 

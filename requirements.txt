@@ -1,6 +1,10 @@
 torch
+pytorch-lightning
+torch_tb_profiler
 sklearn
 tensorboard
 pandas
 numpy
 torchtest
+matplotlib
+gcsfs

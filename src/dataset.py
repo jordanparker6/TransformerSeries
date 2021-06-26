@@ -58,7 +58,7 @@ class TimeSeriesPreprocessor:
         # could also add day of week, week of year
         df['timestamp'] = df[date_column]
         if date_column != "timestamp":
-            df.drop(columns=[date_column])
+            df = df.drop(columns=[date_column])
         df = df.set_index("timestamp")
         return df
 
@@ -139,11 +139,11 @@ class TimeSeriesDataset(Dataset):
 
         X_i = X.index.values
         Y_i = Y.index.values
-        X = torch.tensor(X.values)
-        Y = torch.tensor(Y.values)
+        X = torch.tensor(X.values).double()
+        Y = torch.tensor(Y.values).double()
 
         X, Y = self.transform(X, Y)
-        
+
         return X_i, Y_i, X, Y, idx
 
     def transform(self, X, Y):
@@ -157,15 +157,28 @@ class TimeSeriesDataset(Dataset):
         return X, Y
 
     def inverse_transform(self, X, scaler):
+        """Rescales a tensor by the transform scaler. Adds padding to tensors not of the original input size"""
         n, shape = len(self.raw_features), X.shape
         assert len(shape) == 3, "Tensor must be of form [nsamples, batch, features]."
-        assert shape[2] == len(self.features), "Dim 2 does not equal feature size."
 
-        X = X[:, :, 0:n].detach().squeeze()
+        X = X.detach().reshape(shape[0], shape[2])[:, 0:n].cpu()
         if shape[2] < n:
             padding = torch.zeros((shape[0], n - shape[2]))
-            X = torch.cat((X, padding), dim=1).to(config.DEVICE)
-        return scaler.inverse_transform(X) 
+            X = torch.cat((X, padding), dim=1)
+        
+        assert X.shape[1] == n, "Dim 2 does not equal feature size."
+        return scaler.inverse_transform(X.cpu().data.numpy())
+
+    def get_parameters(self):
+        return {
+            "targets": self.targets,
+            "features": self.features,
+            "raw_features": self.raw_features,
+            "training_length": self.T,
+            "forecast_window": self.S,
+            "groups": self.groups,
+            "dates": self.dates
+        }
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='CLI to execute data preprocessing.')
@@ -175,7 +188,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    processor = TimeSeriesPreprocessor(Path())
+    processor = TimeSeriesPreprocessor(config.DATA_DIR)
     train, test = processor(
             args.csv_file, 
             args.date_column,

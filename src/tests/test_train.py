@@ -8,7 +8,6 @@ sys.path.insert(0, parent_dir_path)
 
 import train
 from dataset import TimeSeriesDataset
-import config
 
 @pytest.fixture
 def dataset():
@@ -18,6 +17,7 @@ def dataset():
         training_length=10,
         forecast_window=3
     )
+
 
 def test_train(dataset):
     train.run_teacher_forcing_training(
