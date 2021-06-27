@@ -2,6 +2,7 @@ from typing import List
 import os
 import shutil
 from pathlib import Path
+import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, GPUStatsMonitor
@@ -31,12 +32,20 @@ def main(
     serve_dir: Path = config.SERVE_DIR
 ):
     """Method to bring together clean-up, data-loading, pre-processing and training"""
+
+    print("""
+    ///////////////////////////////////////////////////////////
+    //  TransformerSeries Forecasting: Starting Training //////
+    ///////////////////////////////////////////////////////////
+    """)
+
     list(map(cleanup, [
         model_dir, 
         model_dir.joinpath("predictions"), 
         model_dir.joinpath("logs")
     ]))
 
+    # DEFINE: Callbacks
     callbacks = [
         EarlyStopping(
             monitor="val_loss",
@@ -49,11 +58,12 @@ def main(
             dirpath=config.MODEL_DIR,
             filename=model_name + '-epoch{epoch:02d}-val_loss{val_loss:.2f}',
             auto_insert_metric_name=False
-        ),
-        GPUStatsMonitor()
+        )
     ]
+    if torch.cuda.is_available():
+        callbacks +=  [GPUStatsMonitor()]
 
-
+    # BUILD: Dataset & DataLoaders
     train_dataset = TimeSeriesDataset(
             csv_file=data_dir.joinpath("train.csv"),
             targets=targets,
@@ -66,24 +76,33 @@ def main(
             training_length=training_length,
             forecast_window=forecast_window
         )
+    train_dataloader = DataLoader(
+            train_dataset, 
+            batch_size=config.DATASET["batch_size"],
+            num_workers=config.DATASET["num_workers"],
+            pin_memory=True
+        )
+    val_dataloader = DataLoader(
+            val_dataset, 
+            batch_size=config.DATASET["batch_size"],
+            num_workers=config.DATASET["num_workers"],
+            pin_memory=True
+        )
     
-    train_loader = DataLoader(
-        train_dataset, 
-        batch_size=config.DATASET["batch_size"],
-        num_workers=config.DATASET["num_workers"],
-        pin_memory=True
-    )
-    val_loader = DataLoader(
-        val_dataset, 
-        batch_size=config.DATASET["batch_size"],
-        num_workers=config.DATASET["num_workers"],
-        pin_memory=True
-    )
-    
+    # BUILD: Model
     model = models.Baseline(train_dataset).double()
-    trainer = pl.Trainer(gpus=1, callbacks=callbacks)
-    trainer.fit(model, train_loader, val_loader)
 
+    # RUN: Training / Validation / Testing
+    trainer = pl.Trainer(
+            gpus=torch.cuda.device_count(), 
+            callbacks=callbacks,
+            max_epochs=epochs,
+            stochastic_weight_avg=True,
+            gradient_clip_val=0.1,
+            profiler='pytorch'
+        )
+    trainer.fit(model, train_dataloader, val_dataloader)
+    trainer.test(test_dataloaders=val_dataloader)
 
     #shutil.copyfile(best_model_path, serve_dir.joinpath(f"{model_name}_model.pth"))
 
