@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, GPUStatsMonitor
+from pytorch_lightning.loggers import TensorBoardLogger
 
 import config
 from dataset import TimeSeriesDataset
@@ -93,9 +94,11 @@ def main(
     model = models.Baseline(train_dataset).double()
 
     # RUN: Training / Validation / Testing
+    logger = TensorBoardLogger(model_dir.joinpath("logs"))
     trainer = pl.Trainer(
             gpus=torch.cuda.device_count(), 
             callbacks=callbacks,
+            logger=logger,
             max_epochs=epochs,
             stochastic_weight_avg=True,
             gradient_clip_val=0.1,
