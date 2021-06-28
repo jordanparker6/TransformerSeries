@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, GPUStatsMonitor
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 import config
 from dataset import TimeSeriesDataset
@@ -35,9 +35,11 @@ def main(
     """Method to bring together clean-up, data-loading, pre-processing and training"""
 
     print("""
-    ///////////////////////////////////////////////////////////
-    //  TransformerSeries Forecasting: Starting Training //////
-    ///////////////////////////////////////////////////////////
+ _____                     __                                ____            _           
+|_   _| __ __ _ _ __  ___ / _| ___  _ __ _ __ ___   ___ _ __/ ___|  ___ _ __(_) ___  ___ 
+  | || '__/ _` | '_ \/ __| |_ / _ \| '__| '_ ` _ \ / _ \ '__\___ \ / _ \ '__| |/ _ \/ __|
+  | || | | (_| | | | \__ \  _| (_) | |  | | | | | |  __/ |   ___) |  __/ |  | |  __/\__ \
+  |_||_|  \__,_|_| |_|___/_|  \___/|_|  |_| |_| |_|\___|_|  |____/ \___|_|  |_|\___||___/
     """)
 
     list(map(cleanup, [
@@ -94,7 +96,8 @@ def main(
     model = models.Baseline(train_dataset).double()
 
     # RUN: Training / Validation / Testing
-    logger = TensorBoardLogger(model_dir.joinpath("logs"))
+    #logger = TensorBoardLogger(model_dir.joinpath("logs"))
+    logger = TensorBoardLogger(save_dir=model_dir.joinpath("logs"))
     trainer = pl.Trainer(
             gpus=torch.cuda.device_count(), 
             callbacks=callbacks,

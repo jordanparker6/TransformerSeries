@@ -31,27 +31,35 @@ Run the following command to run tensorboard
 This repo implements a configurable train / evaluation loop for timeseries data. It is built to
 operate with pandas dataframes.
 
-The dataset.py file preprocess a csv file by completing the following:
+The preprocess.py file preprocess a csv file by completing the following:
  - It ensures that the timeseries is in time ascending order.
  - It encodes a time position using a sin / cos encoding of the hour, day and month frequencies.
- - It sorts the column order of features.
+ - It sorts the column order of features. Order as follows: Targets / Raw Features / Engineered Features
  - It creates a test / train split and saves the files in DATA_DIR.
- - It min/max scales all input timeseries on load to avoid target leakage.
 
- The training loop utilises teacher forcing (with sampling) to improve the training process and 
- avoid overfitting.
+The TimeSeriresDataset class implements the following transformations to the data:
+ - It min/max scales each timeseries to avoid target leakage.
 
- The metrics calculated in the evaluation loop can be configured in the configuration file. Evaluation
- metrics and sample plots are all viewable within tensorboard.
+## Training
+The training loop utilises teacher forcing (with sampling) to improve the training process and 
+avoid overfitting.
 
+## Metrics
+The metrics calculated in the evaluation loop can be configured in the configuration file. Evaluation
+metrics and sample plots are all viewable within tensorboard.
+
+## Models
 The main focus of this repo is the exploration of Transformer architecture for timeseries analysis.
 However, the following models are also included for benchmarking purposes:
  - A Baseline heuristic model
  - A vanila LSTM model with a dense final layer
 
+## Configuration
 
+- TO DO: Move the configuration from .env for a YAML file with models / datasets definable similar to docker-compose services.
 
 ## To Do
 
 - Weights & Bias integration for hyperparameter tuning
 - Pulumi Integration for model serving Infra as Code
+- Grid.ai integration for easy training
