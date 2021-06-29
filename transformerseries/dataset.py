@@ -5,7 +5,7 @@ from typing import List
 import joblib
 import torch
 from torch.utils.data import Dataset
-from sklearn.preprocessing import MinMaxScaler
+from sklearn import preprocessing
 
 import config
 
@@ -31,47 +31,59 @@ class TimeSeriesDataset(Dataset):
         assert "group_id" in df.columns, "Column 'group_id' does not exist. Please ensure the dataset has been preprocessed."
         assert all(x in df.columns for x in targets), "A target column doesn't exist in the dataset."
         assert all(x in df.columns for x in position_encoded), "The target dataset has not been position encoded. Please ensure the dataset has been preprocessed"
+       
+        df = df.drop(columns=["timestamp"])
 
-        self.dates = df["timestamp"]
-        self.groups = df["group_id"].unique().tolist()
-        self.df = df.drop(columns=["timestamp"])
-        self.scaler = MinMaxScaler()                    # could make this also NormScaler
-        self.T = training_length
-        self.S = forecast_window
+        le = preprocessing.LabelEncoder()
+        df["group_id"] = le.fit_transform(df.group_id)
+        self.le = le
+
+        scaler = MinMaxScaler()  
+        df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+
+        self.df = df
+        self.scaler = scaler                  # could make this also NormScaler
+        self.training_length = training_length
+        self.forecast_window = forecast_window
         
         cols = [col for col in self.df.columns if col not in ["group_id"]]
         self.raw_features = [col for col in cols if col not in position_encoded]
         self.features = self.raw_features + position_encoded
         self.targets = targets
 
+        self.build_dataset()
+    
+    def build_dataset(self):
+        X = []
+        Y = []
+
+        df = self.df.loc[: , self.features]
+        unique_groups = df.group_id.unique()
+
+        for group in unique_groups:
+
+            tmp = df[df.group_id == group].values
+            itr = range(0, tmp.shape[0], self.training_length + self.forecast_window)
+            for i in itr:
+
+                src = tmp[i: i+self.training_length]
+                trg = tmp[i+self.training_length: i+self.training_length+self.forecast_window]
+
+                X.append(src)
+                Y.append(trg)
+
+        self.X = X
+        self.Y = Y
+
     def __len__(self):
-        """Returns the number or groups."""
-        return len(self.df.groupby(by=["group_id"]))
+        return len(self.X)
 
     def __getitem__(self, idx):
-        """
-        Randomly pulls a timeseries for each group.
-        The lenght of the timeseries X, Y is the training length and forecast window.
-        """
-        group = self.groups[idx]
-        start = np.random.randint(0, len(self.df[self.df["group_id"] == group]) - self.T - self.S) 
+        return self.X[idx], self.Y[idx]
 
-        group_df = self.df.loc[self.df["group_id"] == group, self.features]
-        
-        X = group_df[start : start + self.T]
-        Y = group_df[start + self.T : start + self.T + self.S]
-
-        X_i = X.index.values
-        Y_i = Y.index.values
-        X = torch.tensor(X.values).double()
-        Y = torch.tensor(Y.values).double()
-
-        X, Y = self.transform(X, Y)
-
-        return X_i, Y_i, X, Y, idx
-
+    """
     def transform(self, X, Y):
-        """Transforms the scale of the X, y with X to avoid target leakage."""
+        Transforms the scale of the X, y with X to avoid target leakage.
         p = len(self.raw_features)
         self.scaler.fit(X[:, 0:p])
         X[:, 0:p] = torch.tensor(self.scaler.transform(X[:, 0:p]))
@@ -81,7 +93,7 @@ class TimeSeriesDataset(Dataset):
         return X, Y
 
     def inverse_transform(self, X, scaler):
-        """Rescales a tensor by the transform scaler. Adds padding to tensors not of the original input size"""
+        Rescales a tensor by the transform scaler. Adds padding to tensors not of the original input size
         n, shape = len(self.raw_features), X.shape
         assert len(shape) == 3, "Tensor must be of form [nsamples, batch, features]."
 
@@ -92,14 +104,16 @@ class TimeSeriesDataset(Dataset):
         
         assert X.shape[1] == n, "Dim 2 does not equal feature size."
         return scaler.inverse_transform(X.cpu().data.numpy())
+    """
+
 
     def get_parameters(self):
         return {
             "targets": self.targets,
             "features": self.features,
             "raw_features": self.raw_features,
-            "training_length": self.T,
-            "forecast_window": self.S,
+            "training_length": self.training_length,
+            "forecast_window": self.forecast_window,
             "groups": self.groups,
             "dates": self.dates
         }
