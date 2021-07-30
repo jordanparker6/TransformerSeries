@@ -1,6 +1,6 @@
 # TransformerSeries
 
-A general purpose implementation of the Transformer architecture for multi-variate timeseries.
+A general purpose implementation of the Transformer architecture for multivariate timeseries.
 
 ### Quick Start
 
