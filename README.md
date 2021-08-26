@@ -63,3 +63,4 @@ However, the following models are also included for benchmarking purposes:
 - Weights & Bias integration for hyperparameter tuning
 - Pulumi Integration for model serving Infra as Code
 - Grid.ai integration for easy training
+- Look at borrowing from Hugginfaces model classes to leverage there tooling

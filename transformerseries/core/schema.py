@@ -1,0 +1,1 @@
+"""Reads a multitable schema defined as YAML."""
